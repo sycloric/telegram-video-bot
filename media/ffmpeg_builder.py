@@ -59,24 +59,20 @@ def build_filter_graph(
 ) -> str:
     
     # 1. Format input video (crop/pad/blur background) -> [v_main]
-    v_format = f"[0:v]scale={target_w}:{target_h}:force_original_aspect_ratio=decrease[v_fg];[0:v]scale={target_w}:{target_h}:force_original_aspect_ratio=increase,crop={target_w}:{target_h},gblur=sigma=20[v_bg_blur];[v_bg_blur][v_fg]overlay=(W-w)/2:(H-h)/2,setsar=1[v_main];"
+    v_format = f"[0:v]scale={target_w}:{target_h}:force_original_aspect_ratio=decrease[v_fg];[0:v]scale={target_w}:{target_h}:force_original_aspect_ratio=increase,crop={target_w}:{target_h},gblur=sigma=20[v_bg_blur];[v_bg_blur][v_fg]overlay=(W-w)/2:(H-h)/2,setsar=1,fps={fps},format=yuv420p[v_main];"
     
     # Split [v_main] into two parts based on split_time
     v_split = f"[v_main]split=2[v_main_p1][v_main_p2];[v_main_p1]trim=start=0:end={split_time},setpts=PTS-STARTPTS[v1];[v_main_p2]trim=start={split_time},setpts=PTS-STARTPTS[v2];"
     
-    # Format freeze frame [2:v]
-    f_format = f"[2:v]scale={target_w}:{target_h}:force_original_aspect_ratio=decrease[f_fg];[2:v]scale={target_w}:{target_h}:force_original_aspect_ratio=increase,crop={target_w}:{target_h},gblur=sigma=20[f_bg_blur];[f_bg_blur][f_fg]overlay=(W-w)/2:(H-h)/2,setsar=1[f_main];"
+    # Format freeze frame [2:v] (this is a single image)
+    f_format = f"[2:v]scale={target_w}:{target_h}:force_original_aspect_ratio=decrease[f_fg];[2:v]scale={target_w}:{target_h}:force_original_aspect_ratio=increase,crop={target_w}:{target_h},gblur=sigma=20[f_bg_blur];[f_bg_blur][f_fg]overlay=(W-w)/2:(H-h)/2,setsar=1,format=yuv420p[f_main];"
     
-    # Loop freeze frame
-    f_loop = f"[f_main]loop=loop=-1:size=1:start=0,setpts=N/FRAME_RATE/TB,trim=duration={freeze_duration}[v_bg_p_raw];"
-    
-    # Apply Effects to freeze frame
+    # Apply Effects to freeze frame -> produces [v_freeze_pause]
     effect_filters = get_effect_filter(effect, target_w, target_h, fps, freeze_duration, ad_duration)
     eff_p = effect_filters["freeze_filter"] + ";"
     
-    # Format Ad video [1:v] - Pad with black or blur
-    # Since ad is standalone now, we just scale and pad it to match target aspect ratio
-    ad_format = f"[1:v]scale={target_w}:{target_h}:force_original_aspect_ratio=decrease,pad={target_w}:{target_h}:(ow-iw)/2:(oh-ih)/2,setsar=1[v_ad_formatted];"
+    # Format Ad video [1:v] - Pad with black to match resolution and fps
+    ad_format = f"[1:v]scale={target_w}:{target_h}:force_original_aspect_ratio=decrease,pad={target_w}:{target_h}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps={fps},format=yuv420p[v_ad_formatted];"
     
     # Concat Video
     v_concat = f"[v1][v_freeze_pause][v_ad_formatted][v2]concat=n=4:v=1:a=0[v_out];"
@@ -87,7 +83,7 @@ def build_filter_graph(
     a_ad = f"[1:a]aformat=sample_rates=44100:channel_layouts=stereo,asetpts=PTS-STARTPTS[a_ad];"
     a_concat = f"[a1][a_pause][a_ad][a2]concat=n=4:v=0:a=1[a_out]"
     
-    return v_format + v_split + f_format + f_loop + eff_p + ad_format + v_concat + a_split + a_pause + a_ad + a_concat
+    return v_format + v_split + f_format + eff_p + ad_format + v_concat + a_split + a_pause + a_ad + a_concat
 
 async def process_advanced_video(
     input_path: str, 
