@@ -14,7 +14,7 @@ def get_effect_filter(effect_name: str, width: int, height: int, fps: float, fre
     freeze_frames = int(fps * freeze_duration)
     
     # Base loop template for static effects
-    base_loop = f"loop=loop=-1:size=1:start=0,setpts=N/FRAME_RATE/TB,trim=duration={freeze_duration},fps={fps},format=yuv420p"
+    base_loop = f"loop=-1:1:0,setpts=N/({fps}*TB),trim=duration={freeze_duration},fps={fps},format=yuv420p"
     
     filters = {}
     
@@ -26,7 +26,7 @@ def get_effect_filter(effect_name: str, width: int, height: int, fps: float, fre
         
     elif effect_name == "Freeze + Zoom":
         z_step = 0.5 / max(freeze_frames, 1)
-        filters["freeze_filter"] = f"[f_main]zoompan=z='min(zoom+{z_step},1.5)':d={freeze_frames}:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s={width}x{height},trim=duration={freeze_duration},fps={fps},format=yuv420p[v_freeze_pause]"
+        filters["freeze_filter"] = f"[f_main]zoompan=z='min(1.0+({z_step}*on),1.5)':d={freeze_frames}:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s={width}x{height},trim=duration={freeze_duration},fps={fps},format=yuv420p[v_freeze_pause]"
 
     elif effect_name == "Flash":
         filters["freeze_filter"] = f"[f_main]{base_loop},fade=t=in:c=white:d={freeze_duration}[v_freeze_pause]"
@@ -44,16 +44,16 @@ def get_effect_filter(effect_name: str, width: int, height: int, fps: float, fre
         filters["freeze_filter"] = f"[f_main]eq=contrast=1.2:saturation=1.2,drawbox=y=0:w=iw:h=ih*0.1:color=black:t=fill,drawbox=y=ih*0.9:w=iw:h=ih*0.1:color=black:t=fill,{base_loop}[v_freeze_pause]"
 
     elif effect_name == "Pop":
-        filters["freeze_filter"] = f"[f_main]zoompan=z='if(lte(pzoom,1.0), 1.2, max(1.1, pzoom-0.05))':d={freeze_frames}:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s={width}x{height},trim=duration={freeze_duration},fps={fps},format=yuv420p[v_freeze_pause]"
+        filters["freeze_filter"] = f"[f_main]zoompan=z='if(eq(on,1), 1.2, max(1.0, pzoom-0.02))':d={freeze_frames}:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s={width}x{height},trim=duration={freeze_duration},fps={fps},format=yuv420p[v_freeze_pause]"
 
     elif effect_name == "Snap":
         filters["freeze_filter"] = f"[f_main]negate,eq=contrast=2,{base_loop}[v_freeze_pause]"
         
     elif effect_name == "Zoom Out":
-        filters["freeze_filter"] = f"[f_main]zoompan=z='max(zoom-0.01, 0.5)':d={freeze_frames}:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s={width}x{height},trim=duration={freeze_duration},fps={fps},format=yuv420p[v_freeze_pause]"
+        z_step = 0.5 / max(freeze_frames, 1)
+        filters["freeze_filter"] = f"[f_main]zoompan=z='max(1.5-({z_step}*on), 1.0)':d={freeze_frames}:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s={width}x{height},trim=duration={freeze_duration},fps={fps},format=yuv420p[v_freeze_pause]"
 
     else:
         filters["freeze_filter"] = f"[f_main]{base_loop}[v_freeze_pause]"
 
     return filters
-

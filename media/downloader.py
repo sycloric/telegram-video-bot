@@ -10,13 +10,15 @@ async def download_tiktok(url: str, output_dir: str) -> str:
     Raises Exception if failed.
     """
     os.makedirs(output_dir, exist_ok=True)
-    output_template = os.path.join(output_dir, f"tiktok_{uuid.uuid4().hex[:8]}.%(ext)s")
+    video_id = uuid.uuid4().hex[:8]
+    output_template = os.path.join(output_dir, f"tiktok_{video_id}.%(ext)s")
     
     cmd = [
         'yt-dlp',
         '--no-playlist',
-        '-f', 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+        '-f', 'bestvideo+bestaudio/best',
         '--merge-output-format', 'mp4',
+        '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
         '-o', output_template,
         url
     ]
@@ -33,12 +35,12 @@ async def download_tiktok(url: str, output_dir: str) -> str:
     if process.returncode != 0:
         err_msg = stderr.decode('utf-8', errors='ignore')
         logger.error(f"yt-dlp failed: {err_msg}")
-        raise Exception(f"Не удалось скачать видео. Возможно, оно приватное или удалено.\n\nДетали:\n{err_msg[:200]}")
+        raise Exception(f"Не удалось скачать видео. Возможно, приватное или недоступно.\n\nОшибка:\n{err_msg[:200]}")
     
     # Find the downloaded file
+    prefix = f"tiktok_{video_id}"
     for file in os.listdir(output_dir):
-        if file.startswith("tiktok_") and file.endswith(".mp4"):
+        if file.startswith(prefix) and file.endswith(".mp4"):
             return os.path.join(output_dir, file)
             
-    raise Exception("Файл скачан, но не найден в папке (возможно, неверный формат).")
-
+    raise Exception("Не удалось найти скачанный файл (возможно, проблема с форматом).")
